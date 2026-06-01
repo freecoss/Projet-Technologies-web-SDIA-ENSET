@@ -40,6 +40,7 @@ export function AdminDashboard() {
   const [showStoreForm, setShowStoreForm] = useState(false)
   const [editingStore, setEditingStore] = useState(null)
   const [storeData, setStoreData] = useState({ name: '', website: '', address: '', logo: '' })
+  const [logoFile, setLogoFile] = useState(null)
   const [isSubmittingStore, setIsSubmittingStore] = useState(false)
 
   // Redirect if not admin or moderator
@@ -163,16 +164,28 @@ export function AdminDashboard() {
     try {
       const method = editingStore ? 'PUT' : 'POST'
       const url = editingStore ? `/api/stores/${editingStore.id}` : `/api/stores`
+      
+      const formData = new FormData()
+      formData.append('name', storeData.name)
+      if (storeData.website) formData.append('website', storeData.website)
+      if (storeData.address) formData.append('address', storeData.address)
+      if (logoFile) {
+        formData.append('logo', logoFile)
+      } else if (storeData.logo) {
+        formData.append('logo', storeData.logo)
+      }
+
       const res = await fetchApi(url, {
         method,
-        body: JSON.stringify(storeData)
+        body: formData
       })
       if (res.ok) {
         toast.success("Magasin enregistré")
         setShowStoreForm(false)
+        setLogoFile(null)
         fetchData()
-      } else toast.error("Erreur")
-    } catch (err) { toast.error("Erreur") } finally { setIsSubmittingStore(false) }
+      } else toast.error("Erreur lors de l'enregistrement")
+    } catch (err) { toast.error("Erreur serveur") } finally { setIsSubmittingStore(false) }
   }
 
   const handleDeleteStore = async (id) => {
@@ -434,7 +447,7 @@ export function AdminDashboard() {
               <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-3xl font-extrabold text-bch7al-navy">Gestion Magasins</h2>
-                  <Button onClick={() => { setEditingStore(null); setStoreData({name:'', website:'', address:'', logo:''}); setShowStoreForm(!showStoreForm); }} className="bg-bch7al-blue text-white rounded-xl">
+                  <Button onClick={() => { setEditingStore(null); setStoreData({name:'', website:'', address:'', logo:''}); setLogoFile(null); setShowStoreForm(!showStoreForm); }} className="bg-bch7al-blue text-white rounded-xl">
                     {showStoreForm ? "Annuler" : <><Plus className="w-4 h-4 mr-2"/> Nouveau Magasin</>}
                   </Button>
                 </div>
@@ -443,7 +456,11 @@ export function AdminDashboard() {
                   <form onSubmit={handleSaveStore} className="bg-bch7al-lightgray/50 p-6 rounded-2xl mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5"><label className="text-sm font-bold text-bch7al-navy">Nom</label><Input required value={storeData.name} onChange={e => setStoreData({...storeData, name: e.target.value})} className="bg-white rounded-xl" /></div>
                     <div className="space-y-1.5"><label className="text-sm font-bold text-bch7al-navy">Site Web URL</label><Input value={storeData.website} onChange={e => setStoreData({...storeData, website: e.target.value})} className="bg-white rounded-xl" /></div>
-                    <div className="space-y-1.5"><label className="text-sm font-bold text-bch7al-navy">Logo URL (Optionnel)</label><Input value={storeData.logo} onChange={e => setStoreData({...storeData, logo: e.target.value})} className="bg-white rounded-xl" /></div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-bold text-bch7al-navy">Logo (Image)</label>
+                      <Input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])} className="bg-white rounded-xl" />
+                      {storeData.logo && !logoFile && <p className="text-xs text-bch7al-darkgray mt-1 truncate">Actuel: {storeData.logo}</p>}
+                    </div>
                     <div className="space-y-1.5"><label className="text-sm font-bold text-bch7al-navy">Adresse</label><Input value={storeData.address} onChange={e => setStoreData({...storeData, address: e.target.value})} className="bg-white rounded-xl" /></div>
                     <Button type="submit" disabled={isSubmittingStore} className="md:col-span-2 bg-bch7al-green hover:bg-green-600 text-white rounded-xl mt-2">
                       <Save className="w-4 h-4 mr-2"/> {isSubmittingStore ? "Enregistrement..." : "Enregistrer Magasin"}
@@ -461,7 +478,7 @@ export function AdminDashboard() {
                         <h4 className="font-extrabold text-lg text-bch7al-navy truncate">{store.name}</h4>
                         <p className="text-xs text-bch7al-darkgray truncate">{store.website || "Pas de site web"}</p>
                         <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingStore(store); setStoreData({name: store.name, website: store.website||'', address: store.address||'', logo: store.logo||''}); setShowStoreForm(true); }} className="text-xs font-bold text-bch7al-blue hover:underline">Modifier</button>
+                          <button onClick={() => { setEditingStore(store); setStoreData({name: store.name, website: store.website||'', address: store.address||'', logo: store.logo||''}); setLogoFile(null); setShowStoreForm(true); }} className="text-xs font-bold text-bch7al-blue hover:underline">Modifier</button>
                           <span className="text-bch7al-darkgray/20">|</span>
                           <button onClick={() => handleDeleteStore(store.id)} className="text-xs font-bold text-bch7al-red hover:underline">Supprimer</button>
                         </div>

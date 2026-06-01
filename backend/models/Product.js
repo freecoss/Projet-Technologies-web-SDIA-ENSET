@@ -6,11 +6,18 @@ class Product {
         
         let query = `
             SELECT p.*, c.name as category_name, u.name as user_name,
-                   MIN(price.amount) as current_price
+                   (
+                       SELECT pr.amount
+                       FROM Price pr
+                       LEFT JOIN Vote v ON pr.id = v.price_id
+                       WHERE pr.product_id = p.id AND pr.status = 'active'
+                       GROUP BY pr.id
+                       ORDER BY (IFNULL(SUM(CASE WHEN v.type = 'upvote' THEN v.weight END), 0) - IFNULL(SUM(CASE WHEN v.type = 'downvote' THEN v.weight END), 0)) DESC, pr.amount ASC
+                       LIMIT 1
+                   ) as current_price
             FROM Product p
             LEFT JOIN Category c ON p.category_id = c.id
             LEFT JOIN User u ON p.user_id = u.id
-            LEFT JOIN Price price ON p.id = price.product_id AND price.status = 'active'
             WHERE p.status = 'approved'
         `;
         const queryParams = [];
@@ -24,7 +31,7 @@ class Product {
             queryParams.push(category);
         }
         if (store) {
-            query += ` AND price.store_id = ?`;
+            query += ` AND EXISTS (SELECT 1 FROM Price pr_store WHERE pr_store.product_id = p.id AND pr_store.store_id = ? AND pr_store.status = 'active')`;
             queryParams.push(store);
         }
         
@@ -32,11 +39,11 @@ class Product {
         
         let having = [];
         if (minPrice) {
-            having.push(`MIN(price.amount) >= ?`);
+            having.push(`current_price >= ?`);
             queryParams.push(minPrice);
         }
         if (maxPrice) {
-            having.push(`MIN(price.amount) <= ?`);
+            having.push(`current_price <= ?`);
             queryParams.push(maxPrice);
         }
         

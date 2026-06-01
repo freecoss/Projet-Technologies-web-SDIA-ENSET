@@ -86,13 +86,15 @@ const updatePrice = async (req, res) => {
 
 const getPricesByProduct = async (req, res) => {
     try {
+        const userId = req.user ? req.user.id : null;
         const query = `
             SELECT p.id, p.amount, p.observedAt, p.status, p.proofImage, 
                    s.name as store_name, s.logo as store_logo,
                    u.name as user_name,
                    prod.name as product_name,
-                   COUNT(CASE WHEN v.type = 'upvote' THEN 1 END) as upvotes,
-                   COUNT(CASE WHEN v.type = 'downvote' THEN 1 END) as downvotes
+                   IFNULL(SUM(CASE WHEN v.type = 'upvote' THEN v.weight END), 0) as upvotes,
+                   IFNULL(SUM(CASE WHEN v.type = 'downvote' THEN v.weight END), 0) as downvotes,
+                   MAX(CASE WHEN v.user_id = ? THEN v.type ELSE NULL END) as userVote
             FROM Price p
             JOIN Store s ON p.store_id = s.id
             JOIN User u ON p.user_id = u.id
@@ -100,9 +102,12 @@ const getPricesByProduct = async (req, res) => {
             LEFT JOIN Vote v ON p.id = v.price_id
             WHERE p.product_id = ? AND p.status != 'rejected'
             GROUP BY p.id
-            ORDER BY p.amount ASC
+            ORDER BY 
+                CASE WHEN p.status = 'active' THEN 0 ELSE 1 END, 
+                (IFNULL(SUM(CASE WHEN v.type = 'upvote' THEN v.weight END), 0) - IFNULL(SUM(CASE WHEN v.type = 'downvote' THEN v.weight END), 0)) DESC, 
+                p.amount ASC
         `;
-        const [prices] = await db.query(query, [req.params.productId]);
+        const [prices] = await db.query(query, [userId, req.params.productId]);
         res.status(200).json(prices);
     } catch (error) {
         console.error(error);
@@ -116,13 +121,22 @@ const getPriceStats = async (req, res) => {
         
         const summaryQuery = `
             SELECT 
-                MIN(amount) as min_price,
-                MAX(amount) as max_price,
-                AVG(amount) as avg_price
-            FROM Price
-            WHERE product_id = ? AND status = 'active'
+                (
+                    SELECT pr.amount
+                    FROM Price pr
+                    LEFT JOIN Vote v ON pr.id = v.price_id
+                    WHERE pr.product_id = p.product_id AND pr.status = 'active'
+                    GROUP BY pr.id
+                    ORDER BY (IFNULL(SUM(CASE WHEN v.type = 'upvote' THEN v.weight END), 0) - IFNULL(SUM(CASE WHEN v.type = 'downvote' THEN v.weight END), 0)) DESC, pr.amount ASC
+                    LIMIT 1
+                ) as min_price,
+                MAX(p.amount) as max_price,
+                AVG(p.amount) as avg_price
+            FROM Price p
+            WHERE p.product_id = ? AND p.status = 'active'
+            GROUP BY p.product_id
         `;
-        const [summary] = await db.query(summaryQuery, [productId]);
+        const [summary] = await db.query(summaryQuery, [productId, productId]);
 
         const historyQuery = `
             SELECT 

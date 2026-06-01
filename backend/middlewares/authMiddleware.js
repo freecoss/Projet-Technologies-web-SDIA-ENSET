@@ -15,6 +15,10 @@ const protect = async (req, res, next) => {
             if (users.length === 0) {
                 return res.status(401).json({ message: 'Non autorisé, utilisateur non trouvé' });
             }
+            
+            if (users[0].role === 'banned') {
+                return res.status(403).json({ message: 'Accès interdit, votre compte a été banni suite à un score de réputation trop faible.' });
+            }
 
             req.user = users[0];
             return next();
@@ -36,4 +40,21 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { protect, authorize };
+const optionalAuth = async (req, res, next) => {
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const [users] = await db.query('SELECT id, role FROM User WHERE id = ?', [decoded.id]);
+            if (users.length > 0) {
+                req.user = users[0];
+            }
+        } catch (error) {
+            // Ne pas bloquer si le token est invalide, continuer en tant que visiteur
+        }
+    }
+    return next();
+};
+
+module.exports = { protect, authorize, optionalAuth };

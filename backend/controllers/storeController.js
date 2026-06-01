@@ -24,12 +24,17 @@ const getStoreById = async (req, res) => {
 };
 
 const createStore = async (req, res) => {
-    const { name, logo, website, address } = req.body;
+    const { name, website, address } = req.body;
     if (!name) return res.status(400).json({ message: 'Le nom est requis' });
 
+    let logoUrl = req.body.logo || null;
+    if (req.file) {
+        logoUrl = req.file.path;
+    }
+
     try {
-        const [result] = await db.query('INSERT INTO Store (name, logo, website, address) VALUES (?, ?, ?, ?)', [name, logo || null, website || null, address || null]);
-        res.status(201).json({ id: result.insertId, name, logo, website, address });
+        const [result] = await db.query('INSERT INTO Store (name, logo, website, address) VALUES (?, ?, ?, ?)', [name, logoUrl, website || null, address || null]);
+        res.status(201).json({ id: result.insertId, name, logo: logoUrl, website, address });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Erreur serveur' });
@@ -37,13 +42,18 @@ const createStore = async (req, res) => {
 };
 
 const updateStore = async (req, res) => {
-    const { name, logo, website, address } = req.body;
+    const { name, website, address } = req.body;
     if (!name) return res.status(400).json({ message: 'Le nom est requis' });
 
+    let logoUrl = req.body.logo || null;
+    if (req.file) {
+        logoUrl = req.file.path;
+    }
+
     try {
-        const [result] = await db.query('UPDATE Store SET name = ?, logo = ?, website = ?, address = ? WHERE id = ?', [name, logo || null, website || null, address || null, req.params.id]);
+        const [result] = await db.query('UPDATE Store SET name = ?, logo = ?, website = ?, address = ? WHERE id = ?', [name, logoUrl, website || null, address || null, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ message: 'Magasin non trouvé' });
-        res.status(200).json({ id: req.params.id, name, logo, website, address });
+        res.status(200).json({ id: req.params.id, name, logo: logoUrl, website, address });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Erreur serveur' });

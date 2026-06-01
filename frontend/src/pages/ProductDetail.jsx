@@ -424,11 +424,29 @@ export function ProductDetail() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleVote(price.id, 'upvote')} className="h-8 rounded-lg border-bch7al-darkgray/20 hover:bg-bch7al-green/10 hover:text-bch7al-green hover:border-bch7al-green/30">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleVote(price.id, 'upvote')} 
+                        className={`h-8 rounded-lg border-bch7al-darkgray/20 transition-colors ${
+                          price.userVote === 'upvote'
+                            ? 'bg-bch7al-green/10 text-bch7al-green border-bch7al-green/30'
+                            : 'hover:bg-bch7al-green/10 hover:text-bch7al-green hover:border-bch7al-green/30'
+                        }`}
+                      >
                         <ThumbsUp className="w-4 h-4 mr-1.5" />
                         <span className="font-bold">{price.upvotes || 0}</span>
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleVote(price.id, 'downvote')} className="h-8 rounded-lg border-bch7al-darkgray/20 hover:bg-bch7al-red/10 hover:text-bch7al-red hover:border-bch7al-red/30">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleVote(price.id, 'downvote')} 
+                        className={`h-8 rounded-lg border-bch7al-darkgray/20 transition-colors ${
+                          price.userVote === 'downvote'
+                            ? 'bg-bch7al-red/10 text-bch7al-red border-bch7al-red/30'
+                            : 'hover:bg-bch7al-red/10 hover:text-bch7al-red hover:border-bch7al-red/30'
+                        }`}
+                      >
                         <ThumbsDown className="w-4 h-4 mr-1.5" />
                         <span className="font-bold">{price.downvotes || 0}</span>
                       </Button>

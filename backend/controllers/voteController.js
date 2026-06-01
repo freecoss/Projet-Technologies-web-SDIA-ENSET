@@ -18,11 +18,25 @@ const toggleVote = async (req, res) => {
         const priceAuthorId = prices[0].user_id;
         const currentStatus = prices[0].status;
 
-        // Fonction utilitaire pour mettre à jour la réputation
+        // Fonction utilitaire pour mettre à jour la réputation et gérer promotion/bannissement
         const updateReputation = async (userId, points) => {
             if (!userId) return; // Si le prix n'a pas d'auteur (ex: utilisateur supprimé)
             await db.query('UPDATE User SET reputation = reputation + ? WHERE id = ?', [points, userId]);
+            
+            // Vérifier le nouveau score pour promotion ou bannissement
+            const [users] = await db.query('SELECT role, reputation FROM User WHERE id = ?', [userId]);
+            if (users.length > 0) {
+                const user = users[0];
+                if (user.role === 'user' && user.reputation >= 500) {
+                    await db.query("UPDATE User SET role = 'moderator' WHERE id = ?", [userId]);
+                } else if (user.role !== 'admin' && user.reputation <= -100) {
+                    await db.query("UPDATE User SET role = 'banned' WHERE id = ?", [userId]);
+                }
+            }
         };
+
+        // Calculer le poids du vote (vétéran = poids 2)
+        const voteWeight = (req.user.reputation >= 200) ? 2 : 1;
 
         // Vérifier si un vote existe déjà
         const [existingVotes] = await db.query(
@@ -47,7 +61,7 @@ const toggleVote = async (req, res) => {
                 responseMessage = 'Vote annulé';
             } else {
                 // Inverser le vote (mettre à jour)
-                await db.query('UPDATE Vote SET type = ? WHERE id = ?', [type, currentVote.id]);
+                await db.query('UPDATE Vote SET type = ?, weight = ? WHERE id = ?', [type, voteWeight, currentVote.id]);
                 
                 // Impact réputation (Inversion)
                 const impact = type === 'upvote' ? 7 : -7;
@@ -58,8 +72,8 @@ const toggleVote = async (req, res) => {
         } else {
             // Créer un nouveau vote
             await db.query(
-                'INSERT INTO Vote (type, user_id, price_id) VALUES (?, ?, ?)',
-                [type, req.user.id, priceId]
+                'INSERT INTO Vote (type, user_id, price_id, weight) VALUES (?, ?, ?, ?)',
+                [type, req.user.id, priceId, voteWeight]
             );
             
             // Impact réputation (Nouveau vote)
@@ -73,20 +87,29 @@ const toggleVote = async (req, res) => {
         // --- VERIFICATION DU STATUT DU PRIX ---
         const [voteStats] = await db.query(`
             SELECT 
-                COUNT(CASE WHEN type = 'upvote' THEN 1 END) as upvotes,
-                COUNT(CASE WHEN type = 'downvote' THEN 1 END) as downvotes
+                IFNULL(SUM(CASE WHEN type = 'upvote' THEN weight END), 0) as upvotes,
+                IFNULL(SUM(CASE WHEN type = 'downvote' THEN weight END), 0) as downvotes
             FROM Vote WHERE price_id = ?
         `, [priceId]);
         
         const score = voteStats[0].upvotes - voteStats[0].downvotes;
         let newStatus = currentStatus;
 
-        if (currentStatus === 'pending' && score >= 2) {
+        // Récupérer le rôle de l'auteur pour savoir si c'est un admin/modérateur
+        const [authorData] = await db.query('SELECT role FROM User WHERE id = ?', [priceAuthorId]);
+        const isAuthorPrivileged = authorData.length > 0 && ['admin', 'moderator'].includes(authorData[0].role);
+
+        if (score >= 2) {
             newStatus = 'active';
-            await db.query("UPDATE Price SET status = 'active' WHERE id = ?", [priceId]);
-        } else if (currentStatus !== 'rejected' && score <= -3) {
+        } else if (score <= -3) {
             newStatus = 'rejected';
-            await db.query("UPDATE Price SET status = 'rejected' WHERE id = ?", [priceId]);
+        } else {
+            // Le score est entre -2 et 1
+            newStatus = isAuthorPrivileged ? 'active' : 'pending';
+        }
+
+        if (newStatus !== currentStatus) {
+            await db.query("UPDATE Price SET status = ? WHERE id = ?", [newStatus, priceId]);
         }
 
         return res.status(statusCode).json({ 

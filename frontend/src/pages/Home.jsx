@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, Package, Tags, Store, ArrowRight } from "lucide-react"
 import API_URL from "@/config"
 
 export function Home() {
+  const { user } = useAuth()
   const [publicStats, setPublicStats] = useState({
     users: 0,
     products: 0,
@@ -45,7 +47,10 @@ export function Home() {
           Économisez intelligemment.
         </h1>
         <p className="text-xl text-bch7al-darkgray max-w-2xl font-medium">
-          Rejoignez la communauté bch7al. Ne payez plus jamais trop cher en profitant des historiques de prix et des alertes de baisse en temps réel.
+          {user 
+            ? `Heureux de vous revoir parmi nous, ${user.name} ! Continuez à explorer les meilleures offres du moment ou accédez à votre espace personnel.`
+            : "Rejoignez la communauté bch7al. Ne payez plus jamais trop cher en profitant des historiques de prix et des alertes de baisse en temps réel."
+          }
         </p>
         <div className="flex flex-col sm:flex-row gap-4 pt-6">
           <Link to="/products">
@@ -54,11 +59,19 @@ export function Home() {
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
-          <Link to="/register">
-            <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg rounded-full border-bch7al-darkgray/20 text-bch7al-navy hover:bg-white hover:text-bch7al-blue transition-all">
-              Créer un compte
-            </Button>
-          </Link>
+          {user ? (
+            <Link to={user.role === 'admin' || user.role === 'moderator' ? "/admin" : "/dashboard"}>
+              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg rounded-full border-bch7al-darkgray/20 text-bch7al-navy hover:bg-white hover:text-bch7al-blue transition-all">
+                Mon Tableau de Bord
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/register">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg rounded-full border-bch7al-darkgray/20 text-bch7al-navy hover:bg-white hover:text-bch7al-blue transition-all">
+                Créer un compte
+              </Button>
+            </Link>
+          )}
         </div>
       </section>
 
